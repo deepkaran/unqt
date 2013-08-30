@@ -46,8 +46,8 @@ class QueryHelper(object):
     def server_cleanup(self, query_conf):
     	pass
 
-	def construct_query(self, query_conf):
-		pass
+    def construct_query(self, query_conf):
+	pass
 		
     def execute_on_server(self, query_exec_string):
     	
@@ -335,40 +335,39 @@ def main():
     	
     	for query_type in query_conf.keys():
     	
-    		if query_type == "view_rest_query":
-                    print "*** Found View REST Query type. Executing. ***"
-                    view_rest_helper.execute_query(query_conf["view_rest_query"], query_conf["info"])
+            if query_type == "view_rest_query":
+                print "*** Found View REST Query type. Executing. ***"
+                view_rest_helper.execute_query(query_conf["view_rest_query"], query_conf["info"])
     		
-    		elif query_type == "view_rest_index_query":
-                    print "*** Found View REST Query With Prebuilt Index type. Executing. ***"
-    		    view_rest_helper.execute_query(query_conf["view_rest_index_query"], query_conf["info"]) 
+            elif query_type == "view_rest_index_query":
+                print "*** Found View REST Query With Prebuilt Index type. Executing. ***"
+    	        view_rest_helper.execute_query(query_conf["view_rest_index_query"], query_conf["info"]) 
     		    	
-    		elif query_type == "tuq_rest_query":
-    		    print "*** Found Tuq REST Query type. Executing. ***"
-    		    tuq_rest_helper.execute_query(query_conf["tuq_rest_query"], query_conf["info"])
+            elif query_type == "tuq_rest_query":
+    	        print "*** Found Tuq REST Query type. Executing. ***"
+                tuq_rest_helper.execute_query(query_conf["tuq_rest_query"], query_conf["info"])
     			
-    		elif query_type == "mongo_python_query":
-    		    print "*** Found Mongo Python Query type. Executing. ***"
-    		    mongo_python_helper.execute_query(query_conf["mongo_python_query"], query_conf["info"])
+            elif query_type == "mongo_python_query":
+                print "*** Found Mongo Python Query type. Executing. ***"
+                mongo_python_helper.execute_query(query_conf["mongo_python_query"], query_conf["info"])
 
-    		elif query_type == "view_python_query":
-    		    print "*** Found View Python Query type. Executing. ***"
-    		    view_python_helper.execute_query(query_conf["view_python_query"], query_conf["info"])
+            elif query_type == "view_python_query":
+                print "*** Found View Python Query type. Executing. ***"
+                view_python_helper.execute_query(query_conf["view_python_query"], query_conf["info"])
 
-    		elif query_type == "view_python_index_query":
-    		    print "*** Found View Python Query With Prebuilt Index type. Executing. ***"
-    		    view_python_helper.execute_query(query_conf["view_python_index_query"], query_conf["info"])
-    		    
+            elif query_type == "view_python_index_query":
+                print "*** Found View Python Query With Prebuilt Index type. Executing. ***"
+                view_python_helper.execute_query(query_conf["view_python_index_query"], query_conf["info"])
+    		
+            elif query_type == "all_docs":
+                print "*** Matched All Docs Query configuration. Executing. ***"
+                pass
+
+            elif query_type == "info":
+                pass
     			
-    		elif query_type == "all_docs":
-    		    print "*** Matched All Docs Query configuration. Executing. ***"
-    		    pass
-
-    		elif query_type == "info":
-    		    pass
-    			
-    		else:
-    		    print "Unsupported query execution type {0}".format(query_type) 
+            else:
+                print "Unsupported query execution type {0}".format(query_type) 
     	
     	results.append(query_conf["info"])
     			
