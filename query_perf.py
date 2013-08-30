@@ -19,6 +19,8 @@ import time
 from optparse import OptionParser
 
 from pymongo import MongoClient
+from couchbase import *
+from couchbase.views.iterator import *
 
 class QueryHelper(object):
 
@@ -65,7 +67,7 @@ class QueryHelper(object):
     	
 
 
-class ViewHelper(QueryHelper):
+class ViewRestQueryHelper(QueryHelper):
 
     def __init__(self, json_ini):
         self.couchbase_ini = json_ini["couchbase"]
@@ -107,7 +109,7 @@ class ViewHelper(QueryHelper):
                 
         query_exec_string = query_string_meta + " '" + query_server_info + query_bucket_ddoc_info + query_params + "'"
         
-    	print "*** Executing View Query ***"
+    	print "*** Executing View REST Query ***"
     	print query_exec_string
     	return query_exec_string
     	
@@ -124,7 +126,7 @@ class ViewHelper(QueryHelper):
         self.execute_on_server(cleanup_exec_string)
 
         
-class MongoHelper(QueryHelper):
+class MongoPythonQueryHelper(QueryHelper):
 
     def __init__(self, json_ini):
         self.mongo_ini = json_ini["mongo"]
@@ -142,12 +144,96 @@ class MongoHelper(QueryHelper):
     	print "Executing Mongo Query"
     	print query_exec_string
     	start = time.time()
-    	query_results = self.collection.find( query_exec_string )
+    	query_results = self.collection.find_one( query_exec_string )
     	end = time.time()
+    	query_exec_time = end - start
+    	print query_results
+        return query_results, query_exec_time    	
+
+
+class ViewPythonQueryHelper(QueryHelper):
+
+    def __init__(self, json_ini):
+        self.couchbase_ini = json_ini["couchbase"]
+
+    def server_setup(self, query_conf):
+#        self.client = Couchbase.connect(host=self.couchbase_ini["cb_server"], bucket=self.couchbase_ini["cb_bucket"], username=self.couchbase_ini["cb_bucket"], password=self.couchbase_ini["cb_bucket_password"])
+#        print "Creating Design Doc"
+#        self.client.design_create(query_conf["ddoc_name"], query_conf["view_def"], use_devmode=False)
+#        
+#        if "exec_post_indexing" in query_conf and query_conf["exec_post_indexing"]:
+#            print "Executing View Query to Build Indexes"
+#            View(self.client, query_conf["ddoc_name"], query_conf["view_name"], stale=false)
+ 
+        self.client = Couchbase.connect(host=self.couchbase_ini["cb_server"], bucket=self.couchbase_ini["cb_bucket"], username=self.couchbase_ini["cb_bucket"], password=self.couchbase_ini["cb_bucket_password"])
+
+#        self.client = Couchbase.connect(host="myaws", bucket="bucket", username="bucket", password="")
+
+        setup_meta = "curl -X PUT -H 'Content-Type: application/json'"
+        setup_server_info = "http://" + self.couchbase_ini["rest_username"] + ":" + self.couchbase_ini["rest_password"] + "@" + self.couchbase_ini["cb_server"] + ":" + str(self.couchbase_ini["cb_port"]) 
+        setup_bucket_ddoc_info = "/" + self.couchbase_ini["cb_bucket"] + "/_design/" + query_conf["ddoc_name"]
+        setup_view_info = str(query_conf["view_def"])
+		
+        setup_exec_string = setup_meta + " '" + setup_server_info + setup_bucket_ddoc_info + "'" + " -d '" + setup_view_info + "'"
+		
+        print "*** Setting up View ***"
+        print setup_exec_string
+        super(ViewPythonQueryHelper, self).execute_on_server(setup_exec_string)
+                        
+        if "exec_post_indexing" in query_conf and query_conf["exec_post_indexing"]:
+            
+            #exec a stale false query, it will build the index
+            query_string_meta = "curl -X GET"
+            query_server_info = "http://" + self.couchbase_ini["rest_username"] + ":" + self.couchbase_ini["rest_password"] + "@" + self.couchbase_ini["cb_server"] + ":" + str(self.couchbase_ini["cb_port"]) 
+            query_bucket_ddoc_info = "/" + self.couchbase_ini["cb_bucket"] + "/_design/" + query_conf["ddoc_name"] + "/_view/" + query_conf["view_name"] 
+            query_params =  "?stale=false&connection_timeout=300000"
+            
+            query_exec_string = query_string_meta + " '" + query_server_info + query_bucket_ddoc_info + query_params + "'"
+            
+            print "*** Building Indexes ***"
+            print query_exec_string
+            super(ViewPythonQueryHelper, self).execute_on_server(query_exec_string)
+               
+    def construct_query(self, query_conf):
+    
+        q = Query()
+        
+        query_params = query_conf["query_params"]
+        
+        if "stale" in query_params:
+            q.update(stale=query_params["stale"])
+        if "startkey" in query_params:
+            q.update(startkey=query_params["startkey"])
+        if "endkey" in query_params:
+            q.update(endkey=query_params["endkey"])
+            
+        return q   
+        
+    def execute_on_server(self, query_exec_string):
+    	
+    	print "Executing View Python Query"
+    	start = time.time()
+    	query_results = View(self.client, "user", "user_by_id", query = query_exec_string)
+    	end = time.time()
+        for result in query_results:
+            print("Emitted key: {0}".format(result.key))
     	query_exec_time = end - start
         return query_results, query_exec_time    	
 
-class TuqtngHelper(QueryHelper):
+    def server_cleanup(self, query_conf):
+
+        cleanup_meta = "curl -X DELETE -H 'Content-Type: application/json'"
+        cleanup_server_info = "http://" + self.couchbase_ini["rest_username"] + ":" + self.couchbase_ini["rest_password"] + "@" + self.couchbase_ini["cb_server"] + ":" + str(self.couchbase_ini["cb_port"]) 
+        cleanup_bucket_ddoc_info = "/" + self.couchbase_ini["cb_bucket"] + "/_design/" + query_conf["ddoc_name"]
+
+        cleanup_exec_string = cleanup_meta + " '" + cleanup_server_info + cleanup_bucket_ddoc_info + "'"
+        
+        print "*** Deleting View ***"
+        print cleanup_exec_string
+        super(ViewPythonQueryHelper, self).execute_on_server(cleanup_exec_string)
+
+
+class TuqtngRestQueryHelper(QueryHelper):
 
     def __init__(self, json_ini):
         self.tuq_ini = json_ini["tuq"]
@@ -162,12 +248,6 @@ class TuqtngHelper(QueryHelper):
     	return query_exec_string
                 
                 
-##class QueryPerf(object):
-##
-##    __init__(self, 
-
-
-
 
 def parse_ini_file(ini_file):
 
@@ -241,9 +321,10 @@ def main():
     
     print "*** Warmed Up! ***"
     
-    tuq_helper = TuqtngHelper(json_ini)
-    view_helper = ViewHelper(json_ini)
-    mongo_helper = MongoHelper(json_ini)
+    tuq_rest_helper = TuqtngRestQueryHelper(json_ini)
+    view_rest_helper = ViewRestQueryHelper(json_ini)
+    mongo_python_helper = MongoPythonQueryHelper(json_ini)
+    view_python_helper = ViewPythonQueryHelper(json_ini)    
     
     results = []
     counter = 0
@@ -254,21 +335,29 @@ def main():
     	
     	for query_type in query_conf.keys():
     	
-    		if query_type == "view_query":
-                    print "*** Found View Query type. Executing. ***"
-                    view_helper.execute_query(query_conf["view_query"], query_conf["info"])
+    		if query_type == "view_rest_query":
+                    print "*** Found View REST Query type. Executing. ***"
+                    view_rest_helper.execute_query(query_conf["view_rest_query"], query_conf["info"])
     		
-    		elif query_type == "view_query_prebuilt_index":
-                    print "*** Found View Query With Prebuilt Index type. Executing. ***"
-    		    view_helper.execute_query(query_conf["view_query_prebuilt_index"], query_conf["info"]) 
+    		elif query_type == "view_rest_index_query":
+                    print "*** Found View REST Query With Prebuilt Index type. Executing. ***"
+    		    view_rest_helper.execute_query(query_conf["view_rest_index_query"], query_conf["info"]) 
     		    	
-    		elif query_type == "tuq_query":
-    		    print "*** Found Tuq Query type. Executing. ***"
-    		    tuq_helper.execute_query(query_conf["tuq_query"], query_conf["info"])
+    		elif query_type == "tuq_rest_query":
+    		    print "*** Found Tuq REST Query type. Executing. ***"
+    		    tuq_rest_helper.execute_query(query_conf["tuq_rest_query"], query_conf["info"])
     			
-    		elif query_type == "mongo_query":
-    		    print "*** Found Mongo Query type. Executing. ***"
-    		    mongo_helper.execute_query(query_conf["mongo_query"], query_conf["info"])
+    		elif query_type == "mongo_python_query":
+    		    print "*** Found Mongo Python Query type. Executing. ***"
+    		    mongo_python_helper.execute_query(query_conf["mongo_python_query"], query_conf["info"])
+
+    		elif query_type == "view_python_query":
+    		    print "*** Found View Python Query type. Executing. ***"
+    		    view_python_helper.execute_query(query_conf["view_python_query"], query_conf["info"])
+
+    		elif query_type == "view_python_index_query":
+    		    print "*** Found View Python Query With Prebuilt Index type. Executing. ***"
+    		    view_python_helper.execute_query(query_conf["view_python_index_query"], query_conf["info"])
     		    
     			
     		elif query_type == "all_docs":
