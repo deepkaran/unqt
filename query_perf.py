@@ -238,6 +238,16 @@ class TuqtngRestQueryHelper(QueryHelper):
     def __init__(self, json_ini):
         self.tuq_ini = json_ini["tuq"]
 
+    def server_setup(self, query_conf):
+
+        if "exec_post_indexing" in query_conf and query_conf["exec_post_indexing"]:
+    	    query_string_meta = "curl -X POST -H 'Content-Type:text/plain'"
+    	    query_server_info = "http://" + self.tuq_ini["tuq_server"] + ":" + str(self.tuq_ini["tuq_port"]) + "/query"
+    	    query_exec_string = query_string_meta + " " + query_server_info + " -d '" + query_conf["create_index"] + "'"
+    	    print "*** Creating Tuq Index ***"
+    	    print query_exec_string
+    	    self.execute_on_server(query_exec_string)
+    
     def construct_query(self, query_conf):
 
     	query_string_meta = "curl -X POST -H 'Content-Type:text/plain'"
@@ -246,7 +256,20 @@ class TuqtngRestQueryHelper(QueryHelper):
     	print "*** Executing Tuq Query ***"
     	print query_exec_string
     	return query_exec_string
+    	self.execute_on_server(query_exec_string)
                 
+    def server_cleanup(self, query_conf):
+
+        if "exec_post_indexing" in query_conf and query_conf["exec_post_indexing"]:
+        
+            cleanup_meta = "curl -X POST -H 'Content-Type:text/plain'"
+            cleanup_server_info = "http://" + self.tuq_ini["tuq_server"] + ":" + str(self.tuq_ini["tuq_port"]) + "/query"
+
+            cleanup_exec_string = cleanup_meta + " " + cleanup_server_info + " -d '" + query_conf["drop_index"] + "'"
+        
+            print "*** Dropping Tuq Index ***"
+            print cleanup_exec_string
+            self.execute_on_server(cleanup_exec_string)
                 
 
 def parse_ini_file(ini_file):
@@ -346,6 +369,10 @@ def main():
             elif query_type == "tuq_rest_query":
     	        print "*** Found Tuq REST Query type. Executing. ***"
                 tuq_rest_helper.execute_query(query_conf["tuq_rest_query"], query_conf["info"])
+
+            elif query_type == "tuq_rest_index_query":
+    	        print "*** Found Tuq REST Query With Prebuilt Index type. Executing. ***"
+                tuq_rest_helper.execute_query(query_conf["tuq_rest_index_query"], query_conf["info"])
     			
             elif query_type == "mongo_python_query":
                 print "*** Found Mongo Python Query type. Executing. ***"
