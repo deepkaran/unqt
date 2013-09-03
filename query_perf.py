@@ -157,43 +157,16 @@ class ViewPythonQueryHelper(QueryHelper):
         self.couchbase_ini = json_ini["couchbase"]
 
     def server_setup(self, query_conf):
-#        self.client = Couchbase.connect(host=self.couchbase_ini["cb_server"], bucket=self.couchbase_ini["cb_bucket"], username=self.couchbase_ini["cb_bucket"], password=self.couchbase_ini["cb_bucket_password"])
-#        print "Creating Design Doc"
-#        self.client.design_create(query_conf["ddoc_name"], query_conf["view_def"], use_devmode=False)
-#        
-#        if "exec_post_indexing" in query_conf and query_conf["exec_post_indexing"]:
-#            print "Executing View Query to Build Indexes"
-#            View(self.client, query_conf["ddoc_name"], query_conf["view_name"], stale=false)
- 
         self.client = Couchbase.connect(host=self.couchbase_ini["cb_server"], bucket=self.couchbase_ini["cb_bucket"], username=self.couchbase_ini["cb_bucket"], password=self.couchbase_ini["cb_bucket_password"])
-
-#        self.client = Couchbase.connect(host="myaws", bucket="bucket", username="bucket", password="")
-
-        setup_meta = "curl -X PUT -H 'Content-Type: application/json'"
-        setup_server_info = "http://" + self.couchbase_ini["rest_username"] + ":" + self.couchbase_ini["rest_password"] + "@" + self.couchbase_ini["cb_server"] + ":" + str(self.couchbase_ini["cb_port"]) 
-        setup_bucket_ddoc_info = "/" + self.couchbase_ini["cb_bucket"] + "/_design/" + query_conf["ddoc_name"]
-        setup_view_info = str(query_conf["view_def"])
-		
-        setup_exec_string = setup_meta + " '" + setup_server_info + setup_bucket_ddoc_info + "'" + " -d '" + setup_view_info + "'"
-		
-        print "*** Setting up View ***"
-        print setup_exec_string
-        super(ViewPythonQueryHelper, self).execute_on_server(setup_exec_string)
-                        
+        print "Creating Design Doc"
+        self.client.design_create(query_conf["ddoc_name"], query_conf["view_def"], use_devmode=False)
+        
         if "exec_post_indexing" in query_conf and query_conf["exec_post_indexing"]:
-            
-            #exec a stale false query, it will build the index
-            query_string_meta = "curl -X GET"
-            query_server_info = "http://" + self.couchbase_ini["rest_username"] + ":" + self.couchbase_ini["rest_password"] + "@" + self.couchbase_ini["cb_server"] + ":" + str(self.couchbase_ini["cb_port"]) 
-            query_bucket_ddoc_info = "/" + self.couchbase_ini["cb_bucket"] + "/_design/" + query_conf["ddoc_name"] + "/_view/" + query_conf["view_name"] 
-            query_params =  "?stale=false&connection_timeout=300000"
-            
-            query_exec_string = query_string_meta + " '" + query_server_info + query_bucket_ddoc_info + query_params + "'"
-            
-            print "*** Building Indexes ***"
-            print query_exec_string
-            super(ViewPythonQueryHelper, self).execute_on_server(query_exec_string)
-               
+            print "Executing View Query to Build Indexes"
+            View(self.client, query_conf["ddoc_name"], query_conf["view_name"], stale=False)
+            for result in query_results:
+                pass
+                
     def construct_query(self, query_conf):
     
         q = Query()
@@ -212,26 +185,19 @@ class ViewPythonQueryHelper(QueryHelper):
     def execute_on_server(self, query_exec_string):
     	
     	print "Executing View Python Query"
+    	
     	start = time.time()
-    	query_results = View(self.client, "user", "user_by_id", query = query_exec_string)
-    	end = time.time()
+    	query_results = View(self.client, query_conf["ddoc_name"], query_conf["view_name"] , query = query_exec_string)
         for result in query_results:
-            print("Emitted key: {0}".format(result.key))
+            print("Emitted key: {0}, value: {1}".format(result.key, result.value))
+    	end = time.time()
     	query_exec_time = end - start
         return query_results, query_exec_time    	
 
     def server_cleanup(self, query_conf):
 
-        cleanup_meta = "curl -X DELETE -H 'Content-Type: application/json'"
-        cleanup_server_info = "http://" + self.couchbase_ini["rest_username"] + ":" + self.couchbase_ini["rest_password"] + "@" + self.couchbase_ini["cb_server"] + ":" + str(self.couchbase_ini["cb_port"]) 
-        cleanup_bucket_ddoc_info = "/" + self.couchbase_ini["cb_bucket"] + "/_design/" + query_conf["ddoc_name"]
-
-        cleanup_exec_string = cleanup_meta + " '" + cleanup_server_info + cleanup_bucket_ddoc_info + "'"
-        
         print "*** Deleting View ***"
-        print cleanup_exec_string
-        super(ViewPythonQueryHelper, self).execute_on_server(cleanup_exec_string)
-
+        self.client.design_delete(query_conf["ddoc_name"], use_devmode=False)
 
 class TuqtngRestQueryHelper(QueryHelper):
 
@@ -278,16 +244,6 @@ def parse_ini_file(ini_file):
         print "INI FILE IS MISSING. EXITTING!!!"
         exit(-1)
 
-#    with open(ini_file, 'r') as ini_file_handle:
-#        raw_data = ini_file_handle.read()
-#        try:
-#            json_ini = json.loads(raw_data)
-#        except ValueError, error:
-#            print error        
-
-#    ini_file_handle.closed
- 
- 
     with open(ini_file, 'r') as ini_file_handle:
         try:
             json_ini = json.load(ini_file_handle)
@@ -303,15 +259,6 @@ def parse_conf_file(conf_file):
         print "CONF FILE IS MISSING. EXITTING!!!"
         exit(-1)
 
-#    with open(conf_file, 'r') as conf_file_handle:
-#        raw_data = conf_file_handle.read()
-#        try:
-#            json_conf = json.loads(raw_data)
-#        except ValueError, error:
-#            print error        
-#
-#    conf_file_handle.closed
- 
     with open(conf_file, 'r') as conf_file_handle:
         try:
             json_conf = json.load(conf_file_handle)
