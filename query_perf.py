@@ -136,6 +136,10 @@ class MongoPythonQueryHelper(QueryHelper):
         self.db = self.client[query_conf["database"]]
         self.collection = self.db[query_conf["collection"]]
         
+        if "exec_post_indexing" in query_conf and query_conf["exec_post_indexing"]:
+            print "Building MongoDB Indexes"
+            self.collection.create_index(query_conf["create_index"], name = "mongo_index")
+
     def construct_query(self, query_conf):
         return query_conf["query"]
     
@@ -144,12 +148,18 @@ class MongoPythonQueryHelper(QueryHelper):
     	print "Executing Mongo Query"
     	print query_exec_string
     	start = time.time()
-    	query_results = self.collection.find_one( query_exec_string )
+        query_results = self.collection.find(query_exec_string)
+        for result in query_results:
+            print result
     	end = time.time()
     	query_exec_time = end - start
-    	print query_results
         return query_results, query_exec_time    	
 
+    def server_cleanup(self, query_conf):
+
+        if "exec_post_indexing" in query_conf and query_conf["exec_post_indexing"]:
+            print "Dropping MongoDB Indexes"
+            self.collection.drop_index("mongo_index")
 
 class ViewPythonQueryHelper(QueryHelper):
 
@@ -324,6 +334,10 @@ def main():
             elif query_type == "mongo_python_query":
                 print "*** Found Mongo Python Query type. Executing. ***"
                 mongo_python_helper.execute_query(query_conf["mongo_python_query"], query_conf["info"])
+
+            elif query_type == "mongo_python_index_query":
+                print "*** Found Mongo Python Query With Prebuilt Index type. Executing. ***"
+                mongo_python_helper.execute_query(query_conf["mongo_python_index_query"], query_conf["info"])
 
             elif query_type == "view_python_query":
                 print "*** Found View Python Query type. Executing. ***"
