@@ -32,7 +32,7 @@ class QueryHelper(object):
     	self.server_setup(query_conf)
     	
     	query_exec_string = self.construct_query(query_conf)
-    	query_results, query_exec_time = self.execute_on_server(query_exec_string)
+        query_results, query_exec_time = self.execute_on_server(query_conf, query_exec_string)
     	
     	self.validate_query_results(query_conf, query_results)
     	
@@ -47,9 +47,9 @@ class QueryHelper(object):
     	pass
 
     def construct_query(self, query_conf):
-	pass
+        pass
 		
-    def execute_on_server(self, query_exec_string):
+    def execute_on_server(self, query_conf, query_exec_string):
     	
     	start = time.time()
     	query_results = subprocess.call(query_exec_string, shell=True)
@@ -83,7 +83,7 @@ class ViewRestQueryHelper(QueryHelper):
 		
         print "*** Setting up View ***"
         print setup_exec_string
-        self.execute_on_server(setup_exec_string)
+        self.execute_on_server(query_conf, setup_exec_string)
                         
         if "exec_post_indexing" in query_conf and query_conf["exec_post_indexing"]:
             
@@ -97,7 +97,7 @@ class ViewRestQueryHelper(QueryHelper):
             
             print "*** Building Indexes ***"
             print query_exec_string
-            self.execute_on_server(query_exec_string)
+            self.execute_on_server(query_conf, query_exec_string)
 
 
     def construct_query(self, query_conf):
@@ -123,7 +123,7 @@ class ViewRestQueryHelper(QueryHelper):
         
         print "*** Deleting View ***"
         print cleanup_exec_string
-        self.execute_on_server(cleanup_exec_string)
+        self.execute_on_server(query_conf, cleanup_exec_string)
 
         
 class MongoPythonQueryHelper(QueryHelper):
@@ -143,7 +143,7 @@ class MongoPythonQueryHelper(QueryHelper):
     def construct_query(self, query_conf):
         return query_conf["query"]
     
-    def execute_on_server(self, query_exec_string):
+    def execute_on_server(self, query_conf, query_exec_string):
     	
     	print "Executing Mongo Query"
     	print query_exec_string
@@ -170,10 +170,11 @@ class ViewPythonQueryHelper(QueryHelper):
         self.client = Couchbase.connect(host=self.couchbase_ini["cb_server"], bucket=self.couchbase_ini["cb_bucket"], username=self.couchbase_ini["cb_bucket"], password=self.couchbase_ini["cb_bucket_password"])
         print "Creating Design Doc"
         self.client.design_create(query_conf["ddoc_name"], query_conf["view_def"], use_devmode=False)
+        time.sleep(2)
         
         if "exec_post_indexing" in query_conf and query_conf["exec_post_indexing"]:
             print "Executing View Query to Build Indexes"
-            View(self.client, query_conf["ddoc_name"], query_conf["view_name"], stale=False)
+            query_results = View(self.client, query_conf["ddoc_name"], query_conf["view_name"], stale=False, connection_timeout = 300000)
             for result in query_results:
                 pass
                 
@@ -192,7 +193,7 @@ class ViewPythonQueryHelper(QueryHelper):
             
         return q   
         
-    def execute_on_server(self, query_exec_string):
+    def execute_on_server(self, query_conf, query_exec_string):
     	
     	print "Executing View Python Query"
     	
@@ -222,7 +223,7 @@ class TuqtngRestQueryHelper(QueryHelper):
     	    query_exec_string = query_string_meta + " " + query_server_info + " -d '" + query_conf["create_index"] + "'"
     	    print "*** Creating Tuq Index ***"
     	    print query_exec_string
-    	    self.execute_on_server(query_exec_string)
+            self.execute_on_server(query_conf, query_exec_string)
     
     def construct_query(self, query_conf):
 
@@ -232,7 +233,7 @@ class TuqtngRestQueryHelper(QueryHelper):
     	print "*** Executing Tuq Query ***"
     	print query_exec_string
     	return query_exec_string
-    	self.execute_on_server(query_exec_string)
+        self.execute_on_server(query_conf, query_exec_string)
                 
     def server_cleanup(self, query_conf):
 
@@ -245,7 +246,7 @@ class TuqtngRestQueryHelper(QueryHelper):
         
             print "*** Dropping Tuq Index ***"
             print cleanup_exec_string
-            self.execute_on_server(cleanup_exec_string)
+            self.execute_on_server(query_conf, cleanup_exec_string)
                 
 
 def parse_ini_file(ini_file):
