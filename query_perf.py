@@ -121,6 +121,7 @@ class ViewRestQueryHelper(QueryHelper):
         print "*** Setting up View ***"
         print setup_exec_string
         self.execute_on_server(setup_exec_string)
+        time.sleep(2)
 
         if "exec_post_indexing" in self.query_conf and self.query_conf["exec_post_indexing"]:
 
