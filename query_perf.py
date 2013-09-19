@@ -117,7 +117,7 @@ class ViewRestQueryHelper(QueryHelper):
         self.execute_on_server(setup_exec_string)
         time.sleep(2)
 
-        if "create_index" in self.query_conf and self.query_conf["create_index"]:
+        if "create_index" in self.query_conf:
 
             #exec a stale false query, it will build the index
             query_string_meta = "curl -X GET"
@@ -175,7 +175,7 @@ class MongoPythonQueryHelper(QueryHelper):
         self.db = self.client[self.query_conf["database"]]
         self.collection = self.db[self.query_conf["collection"]]
 
-        if "create_index" in self.query_conf and self.query_conf["create_index"]:
+        if "create_index" in self.query_conf:
             print "Building MongoDB Indexes"
             self.collection.create_index(self.query_conf["create_index"], name = "mongo_index")
 
@@ -219,7 +219,7 @@ class MongoPythonQueryHelper(QueryHelper):
 
     def server_cleanup(self):
 
-        if "create_index" in self.query_conf and self.query_conf["create_index"]:
+        if "drop_index" in self.query_conf:
             print "Dropping MongoDB Indexes"
             self.collection.drop_index("mongo_index")
 
@@ -242,7 +242,7 @@ class ViewPythonQueryHelper(QueryHelper):
         self.client.design_create(self.query_conf["ddoc_name"], self.query_conf["view_def"], use_devmode=False)
         time.sleep(2)
 
-        if "create_index" in self.query_conf and self.query_conf["create_index"]:
+        if "create_index" in self.query_conf:
             print "Executing View Query to Build Indexes"
             query_results = View(self.client, self.query_conf["ddoc_name"], self.query_conf["view_name"], stale=False, connection_timeout = 300000)
             for result in query_results:
@@ -288,7 +288,7 @@ class TuqtngRestQueryHelper(QueryHelper):
 
     def server_setup(self):
 
-        if "create_index" in self.query_conf and self.query_conf["create_index"]:
+        if "create_index" in self.query_conf:
     	    query_string_meta = "curl -X POST -H 'Content-Type:text/plain'"
     	    query_server_info = "http://" + self.tuq_ini["tuq_server"] + ":" + str(self.tuq_ini["tuq_port"]) + "/query"
     	    query_exec_string = query_string_meta + " " + query_server_info + " -d '" + self.query_conf["create_index"] + "'"
@@ -307,7 +307,7 @@ class TuqtngRestQueryHelper(QueryHelper):
         
     def server_cleanup(self):
 
-        if "create_index" in self.query_conf and self.query_conf["create_index"]:
+        if "drop_index" in self.query_conf:
 
             cleanup_meta = "curl -X POST -H 'Content-Type:text/plain'"
             cleanup_server_info = "http://" + self.tuq_ini["tuq_server"] + ":" + str(self.tuq_ini["tuq_port"]) + "/query"
@@ -358,8 +358,6 @@ def execute_single_query_conf(query_conf, json_ini):
     for query in query_conf["query_list"]:
 
         process_results = True
-        query["create_index"] = False
-        query["drop_index"] = False
         
         if "skip" in query and query["skip"]:
             print "Skipping {0}".format(query["type"])
@@ -373,8 +371,6 @@ def execute_single_query_conf(query_conf, json_ini):
 
         elif query["type"] == "view_rest_index_query":
             print "*** Found View REST Query With Prebuilt Index type. Executing. ***"
-            query["create_index"] = True
-            query["drop_index"] = True
             view_rest_helper = ViewRestQueryHelper(json_ini)
     	    view_rest_helper.execute_query(query) 
 
@@ -385,15 +381,11 @@ def execute_single_query_conf(query_conf, json_ini):
 
         elif query["type"] == "tuq_rest_index_query":
     	    print "*** Found Tuq REST Query With Prebuilt Index type. Executing. ***"
-            query["create_index"] = True
-            query["drop_index"] = True
             tuq_rest_helper = TuqtngRestQueryHelper(json_ini)
             tuq_rest_helper.execute_query(query)
 
         elif query["type"] == "tuq_rest_primary_index_query":
     	    print "*** Found Tuq REST Query With Prebuilt Primary Index type. Executing. ***"
-            query["create_index"] = True
-            query["drop_index"] = False
             tuq_rest_helper = TuqtngRestQueryHelper(json_ini)
             tuq_rest_helper.execute_query(query)
 
@@ -404,8 +396,6 @@ def execute_single_query_conf(query_conf, json_ini):
 
         elif query["type"] == "mongo_python_index_query":
             print "*** Found Mongo Python Query With Prebuilt Index type. Executing. ***"
-            query["create_index"] = True
-            query["drop_index"] = True
             mongo_python_helper = MongoPythonQueryHelper(json_ini)
             mongo_python_helper.execute_query(query)
 
@@ -416,8 +406,6 @@ def execute_single_query_conf(query_conf, json_ini):
 
         elif query["type"] == "view_python_index_query":
             print "*** Found View Python Query With Prebuilt Index type. Executing. ***"
-            query["create_index"] = True
-            query["drop_index"] = True
             view_python_helper = ViewPythonQueryHelper(json_ini)
             view_python_helper.execute_query(query)
 
