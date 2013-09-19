@@ -3,14 +3,18 @@
 
 
 '''TODO'''
-# some lines in  construct query need to be in multiple lines
 
 ##support reading map def from file
 ##rest_username/password needs to be changed to something more precise
 ##
-##add ability to compare results 
 ##support comparing resultset from a file
 ##http://stackoverflow.com/questions/1174984/how-to-efficiently-calculate-a-running-standard-deviation
+##break down code in logical chunks
+##change threads to process
+##each worker to have its own connection
+##allow multiple concurrent queries 
+##break long lines to multiple lines
+
 
 import os
 import json
@@ -18,11 +22,6 @@ import subprocess
 import time
 
 from optparse import OptionParser
-
-from pymongo import MongoClient
-from couchbase import *
-from couchbase.views.iterator import *
-
 from threading import Thread
 
 class QueryHelper(object):
@@ -35,29 +34,24 @@ class QueryHelper(object):
 
     	self.query_conf = query_conf
 
-    	self.server_setup()
-    	
-    	query_exec_string = self.construct_query()
-    	
-        if "repeat" in self.query_conf:
-    	    repeat_count = self.query_conf["repeat"]
+        if "num_workers" in self.query_conf:
+            self.num_workers = self.query_conf["num_workers"]
         else:
-            repeat_count = 1
+            self.num_workers = 1
 
-        if "workers" in self.query_conf:
-            worker_count = self.query_conf["workers"]
+        if "repeat_per_worker" in self.query_conf:
+            self.repeat_per_worker = self.query_conf["repeat_per_worker"]
         else:
-            worker_count = 1
+            self.repeat_per_worker = 1
 
-    	exec_count_per_worker = repeat_count / worker_count
-    	
-    	if exec_count_per_worker < 1:
-            exec_count_per_worker = 1
+        self.server_setup()
+
+        query_exec_string = self.construct_query()
 
         threads = []
-        for cnt in xrange(worker_count):
+        for cnt in xrange(self.num_workers):
 
-            thread = Thread(target=self.execute_with_worker, args=(query_exec_string, exec_count_per_worker))
+            thread = Thread(target=self.execute_with_worker, args=(query_exec_string, self.repeat_per_worker))
             thread.start()
             threads.append(thread)
 
@@ -65,12 +59,12 @@ class QueryHelper(object):
             thread.join()
 
         query_conf["timings"] = self.query_timings
-        
+
     	self.server_cleanup()
+    	
+    def execute_with_worker(self, query_exec_string, repeat_per_worker):
 
-    def execute_with_worker(self, query_exec_string, exec_count_per_worker):
-
-    	for cnt in xrange(exec_count_per_worker):
+    	for cnt in xrange(repeat_per_worker):
             query_results, query_exec_time = self.execute_on_server(query_exec_string)
 
             self.validate_query_results(query_results)
@@ -123,7 +117,7 @@ class ViewRestQueryHelper(QueryHelper):
         self.execute_on_server(setup_exec_string)
         time.sleep(2)
 
-        if "exec_post_indexing" in self.query_conf and self.query_conf["exec_post_indexing"]:
+        if "create_index" in self.query_conf and self.query_conf["create_index"]:
 
             #exec a stale false query, it will build the index
             query_string_meta = "curl -X GET"
@@ -170,11 +164,18 @@ class MongoPythonQueryHelper(QueryHelper):
         self.mongo_ini = json_ini["mongo"]
 
     def server_setup(self):
+    
+        try:
+            from pymongo import MongoClient
+        except ImportError:
+            print "Unable to import MongoClient from pymongo. Please see http://api.mongodb.org/python/current/installation.html"
+            sys.exit(0)
+
         self.client = MongoClient(self.mongo_ini["mongo_server"], self.mongo_ini["mongo_port"])
         self.db = self.client[self.query_conf["database"]]
         self.collection = self.db[self.query_conf["collection"]]
 
-        if "exec_post_indexing" in self.query_conf and self.query_conf["exec_post_indexing"]:
+        if "create_index" in self.query_conf and self.query_conf["create_index"]:
             print "Building MongoDB Indexes"
             self.collection.create_index(self.query_conf["create_index"], name = "mongo_index")
 
@@ -186,16 +187,39 @@ class MongoPythonQueryHelper(QueryHelper):
     	print "Executing Mongo Query"
     	print query_exec_string
     	start = time.time()
-        query_results = self.collection.find(query_exec_string)
-        for result in query_results:
-            print result
+    	if "category" in self.query_conf:
+    	    category = self.query_conf["category"]
+    	else:
+    	    category = "find"
+    	
+    	if category == "find":
+            query_results = self.collection.find(query_exec_string)
+            
+        elif category == "count":
+            query_results = self.collection.find(query_exec_string).count()
+            
+        elif category == "group":
+            query_results = self.collection.aggregate(query_exec_string)
+        
+        elif category == "orderby":
+            query_results = self.collection.find().sort(self.query_conf["orderby"])
+        
+        elif category == "distinct":
+            query_results = self.collection.distinct(query_exec_string)
+
+        
+        if category == "count":
+            print query_results
+        else:
+            for result in query_results:
+                print result
     	end = time.time()
     	query_exec_time = end - start
         return query_results, query_exec_time    	
 
     def server_cleanup(self):
 
-        if "exec_post_indexing" in self.query_conf and self.query_conf["exec_post_indexing"]:
+        if "create_index" in self.query_conf and self.query_conf["create_index"]:
             print "Dropping MongoDB Indexes"
             self.collection.drop_index("mongo_index")
 
@@ -206,12 +230,19 @@ class ViewPythonQueryHelper(QueryHelper):
         self.couchbase_ini = json_ini["couchbase"]
 
     def server_setup(self):
+    
+        try:
+            from couchbase import Couchbase
+        except ImportError:
+            print "Unable to import Couchbase Python Client. Please see http://www.couchbase.com/communities/python/getting-started."
+            sys.exit(0)
+
         self.client = Couchbase.connect(host=self.couchbase_ini["cb_server"], bucket=self.couchbase_ini["cb_bucket"], username=self.couchbase_ini["cb_bucket"], password=self.couchbase_ini["cb_bucket_password"])
         print "Creating Design Doc"
         self.client.design_create(self.query_conf["ddoc_name"], self.query_conf["view_def"], use_devmode=False)
         time.sleep(2)
 
-        if "exec_post_indexing" in self.query_conf and self.query_conf["exec_post_indexing"]:
+        if "create_index" in self.query_conf and self.query_conf["create_index"]:
             print "Executing View Query to Build Indexes"
             query_results = View(self.client, self.query_conf["ddoc_name"], self.query_conf["view_name"], stale=False, connection_timeout = 300000)
             for result in query_results:
@@ -257,7 +288,7 @@ class TuqtngRestQueryHelper(QueryHelper):
 
     def server_setup(self):
 
-        if "exec_post_indexing" in self.query_conf and self.query_conf["exec_post_indexing"]:
+        if "create_index" in self.query_conf and self.query_conf["create_index"]:
     	    query_string_meta = "curl -X POST -H 'Content-Type:text/plain'"
     	    query_server_info = "http://" + self.tuq_ini["tuq_server"] + ":" + str(self.tuq_ini["tuq_port"]) + "/query"
     	    query_exec_string = query_string_meta + " " + query_server_info + " -d '" + self.query_conf["create_index"] + "'"
@@ -273,11 +304,10 @@ class TuqtngRestQueryHelper(QueryHelper):
     	print "*** Executing Tuq Query ***"
     	print query_exec_string
     	return query_exec_string
-        self.execute_on_server(query_exec_string)
         
     def server_cleanup(self):
 
-        if "exec_post_indexing" in self.query_conf and self.query_conf["exec_post_indexing"]:
+        if "create_index" in self.query_conf and self.query_conf["create_index"]:
 
             cleanup_meta = "curl -X POST -H 'Content-Type:text/plain'"
             cleanup_server_info = "http://" + self.tuq_ini["tuq_server"] + ":" + str(self.tuq_ini["tuq_port"]) + "/query"
@@ -323,16 +353,28 @@ def parse_conf_file(conf_file):
 def execute_single_query_conf(query_conf, json_ini):
 
     results = []
+    process_results = True
 
     for query in query_conf["query_list"]:
 
-        if query["type"] == "view_rest_query":
+        process_results = True
+        query["create_index"] = False
+        query["drop_index"] = False
+        
+        if "skip" in query and query["skip"]:
+            print "Skipping {0}".format(query["type"])
+            process_results = False
+            pass
+            
+        elif query["type"] == "view_rest_query":
             print "*** Found View REST Query type. Executing. ***"
             view_rest_helper = ViewRestQueryHelper(json_ini)
             view_rest_helper.execute_query(query)
 
         elif query["type"] == "view_rest_index_query":
             print "*** Found View REST Query With Prebuilt Index type. Executing. ***"
+            query["create_index"] = True
+            query["drop_index"] = True
             view_rest_helper = ViewRestQueryHelper(json_ini)
     	    view_rest_helper.execute_query(query) 
 
@@ -343,6 +385,15 @@ def execute_single_query_conf(query_conf, json_ini):
 
         elif query["type"] == "tuq_rest_index_query":
     	    print "*** Found Tuq REST Query With Prebuilt Index type. Executing. ***"
+            query["create_index"] = True
+            query["drop_index"] = True
+            tuq_rest_helper = TuqtngRestQueryHelper(json_ini)
+            tuq_rest_helper.execute_query(query)
+
+        elif query["type"] == "tuq_rest_primary_index_query":
+    	    print "*** Found Tuq REST Query With Prebuilt Primary Index type. Executing. ***"
+            query["create_index"] = True
+            query["drop_index"] = False
             tuq_rest_helper = TuqtngRestQueryHelper(json_ini)
             tuq_rest_helper.execute_query(query)
 
@@ -353,6 +404,8 @@ def execute_single_query_conf(query_conf, json_ini):
 
         elif query["type"] == "mongo_python_index_query":
             print "*** Found Mongo Python Query With Prebuilt Index type. Executing. ***"
+            query["create_index"] = True
+            query["drop_index"] = True
             mongo_python_helper = MongoPythonQueryHelper(json_ini)
             mongo_python_helper.execute_query(query)
 
@@ -363,24 +416,29 @@ def execute_single_query_conf(query_conf, json_ini):
 
         elif query["type"] == "view_python_index_query":
             print "*** Found View Python Query With Prebuilt Index type. Executing. ***"
+            query["create_index"] = True
+            query["drop_index"] = True
             view_python_helper = ViewPythonQueryHelper(json_ini)
             view_python_helper.execute_query(query)
 
         elif query["type"] == "all_docs":
-            print "*** Matched All Docs Query configuration. Executing. ***"
+            print "*** Matched All Docs Query configuration. Not Yet Implemented. Skipping.***"
+            process_results = False
             pass
-
+            
         else:
             print "Unsupported query execution type {0}".format(query["type"]) 
-            
-        result = {}
-        result["type"] = query["type"]
-        result["avg_time"] = sum(query["timings"]) / len(query["timings"])
-        result["max_time"] = max(query["timings"])
-        result["min_time"] = min(query["timings"])
-        result["num_timings"] = len(query["timings"])
-        results.append(result)
-        time.sleep(2)
+            process_results = False
+         
+        if process_results:   
+            result = {}
+            result["type"] = query["type"]
+            result["avg_time"] = sum(query["timings"]) / len(query["timings"])
+            result["max_time"] = max(query["timings"])
+            result["min_time"] = min(query["timings"])
+            result["num_timings"] = len(query["timings"])
+            results.append(result)
+            time.sleep(2)
 
     query_conf["results"] = results
 #    print "*** RESULTS ***"
@@ -413,18 +471,24 @@ def main():
     for query_conf in json_conf:
         counter = counter + 1
         print "*** EXECUTING CONF {0} IN {1} FILE ***".format(counter, options.conf_file)
-        thread = Thread(target=execute_single_query_conf, args=(query_conf, json_ini))
-        thread.start()
-        threads.append(thread)
+        execute_single_query_conf(query_conf, json_ini)
+
+##        thread = Thread(target=execute_single_query_conf, args=(query_conf, json_ini))
+##        thread.start()
+##        threads.append(thread)
     
-    for thread in threads:
-        thread.join()
+##    for thread in threads:
+##        thread.join()
  
     print "*** FINISHED Executing {0} Configurations from {1} File ***".format(counter, options.conf_file)
 
     print "*** RESULTS ***"
 
     for query_conf in json_conf:
+        print "CONF DETAILS: "
+        print query_conf["info"]
+##        print json.dumps(query_conf["info"], sort_keys=True, indent=4, separators=(',', ': ')) 
+        print "TIMINGS: "
         print json.dumps(query_conf["results"], sort_keys=True, indent=4, separators=(',', ': '))   
 
 if __name__ == '__main__':
