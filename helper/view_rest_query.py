@@ -38,7 +38,7 @@ class ViewRestQueryHelper(QueryHelper):
         self.execute_on_server(setup_exec_string)
         time.sleep(2)
 
-        if "create_index" in self.query_conf:
+        if self.query_conf["type"] == "view_rest_index_query":
 
             #exec a stale false query, it will build the index
             query_string_meta = "curl -X GET"

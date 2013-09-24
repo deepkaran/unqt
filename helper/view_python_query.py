@@ -14,6 +14,7 @@ class ViewPythonQueryHelper(QueryHelper):
 
         try:
             from couchbase import Couchbase
+            from couchbase.views.iterator import View
         except ImportError:
             print "Unable to import Couchbase Python Client. \
                    Please see http://www.couchbase.com/communities/python/getting-started."
@@ -42,7 +43,7 @@ class ViewPythonQueryHelper(QueryHelper):
                                      use_devmode=False)
         time.sleep(2)
 
-        if "create_index" in self.query_conf:
+        if self.query_conf["type"] == "view_python_index_query":
             print "Executing View Query to Build Indexes"
             query_results = View(self.clients[0], 
                                  self.query_conf["ddoc_name"], 

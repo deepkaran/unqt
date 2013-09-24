@@ -24,12 +24,12 @@ class MongoPythonQueryHelper(QueryHelper):
             self.clients.append(MongoClient(self.mongo_ini["mongo_server"], 
                                             self.mongo_ini["mongo_port"]))
                                             
-            self.dbs.append(self.client[self.mongo_ini["mongo_db"]])
-            self.collections.append(self.db[self.mongo_ini["mongo_collection"]])
+            self.dbs.append(self.clients[0][self.mongo_ini["mongo_db"]])
+            self.collections.append(self.dbs[0][self.mongo_ini["mongo_collection"]])
 
         if "create_index" in self.query_conf:
             print "Building MongoDB Indexes"
-            self.collection[0].create_index(self.query_conf["create_index"], 
+            self.collections[0].create_index(self.query_conf["create_index"], 
                                             name = "mongo_index")
 
     def construct_query(self):
@@ -46,22 +46,22 @@ class MongoPythonQueryHelper(QueryHelper):
     	    category = "find"
 
     	if category == "find":
-            query_results = self.collection[worker_id].find(query_exec_string)
+            query_results = self.collections[worker_id].find(query_exec_string)
 
         elif category == "count":
-            query_results = self.collection[worker_id].find(query_exec_string).count()
+            query_results = self.collections[worker_id].find(query_exec_string).count()
 
         elif category == "group":
-            query_results = self.collection[worker_id].aggregate(query_exec_string)
+            query_results = self.collections[worker_id].aggregate(query_exec_string)
 
         elif category == "orderby":
             if "limit" in self.query_conf:
-                query_results = self.collection[worker_id].find().sort(self.query_conf["orderby"], 1).limit(self.query_conf["limit"])
+                query_results = self.collections[worker_id].find().sort(self.query_conf["orderby"], 1).limit(self.query_conf["limit"])
             else:
-                query_results = self.collection[worker_id].find().sort(self.query_conf["orderby"], 1)
+                query_results = self.collections[worker_id].find().sort(self.query_conf["orderby"], 1)
 
         elif category == "distinct":
-            query_results = self.collection[worker_id].distinct(query_exec_string)
+            query_results = self.collections[worker_id].distinct(query_exec_string)
 
         if category == "count" or category == "group" or category == "distinct":
             print query_results
@@ -76,5 +76,5 @@ class MongoPythonQueryHelper(QueryHelper):
 
         if "drop_index" in self.query_conf:
             print "Dropping MongoDB Indexes"
-            self.collection[0].drop_index("mongo_index")
+            self.collections[0].drop_index("mongo_index")
 
