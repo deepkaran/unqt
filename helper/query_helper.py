@@ -1,6 +1,8 @@
 
+import os
 import subprocess
 import time
+import json
 
 from threading import Thread
 
@@ -75,5 +77,20 @@ class QueryHelper(object):
 
     def log_query_timings(self, query_exec_time):
         self.query_timings.append(query_exec_time)
+        
+    def read_json_file(self, file_name_with_path):
+    
+        if not os.path.isfile(file_name_with_path):
+            print "JSON FILE {0} IS MISSING!!".format(file_name_with_path)
+            return ""
+
+        with open(file_name_with_path, 'r') as json_file_handle:
+            try:
+                json_contents = json.load(json_file_handle)
+            except ValueError, error:
+                print error  
+                
+        return json_contents      
+
 
 

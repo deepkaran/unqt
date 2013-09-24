@@ -20,10 +20,18 @@ class ViewRestQueryHelper(QueryHelper):
         setup_bucket_ddoc_info = "/" + self.couchbase_ini["cb_bucket"] + \
                                  "/_design/" + self.query_conf["ddoc_name"]
                                  
-        setup_view_info = str(self.query_conf["view_def"])
-
-        setup_exec_string = setup_meta + " '" + setup_server_info + \
+        if "view_def" in self.query_conf:         
+            setup_view_info = str(self.query_conf["view_def"])
+            setup_exec_string = setup_meta + " '" + setup_server_info + \
                                setup_bucket_ddoc_info + "'" + " -d '" + setup_view_info + "'"
+
+        elif "view_def_file" in self.query_conf:
+            setup_view_info =  "conf/ddocs/" + self.query_conf["view_def_file"]
+            setup_exec_string = setup_meta + " '" + setup_server_info + \
+                               setup_bucket_ddoc_info + "'" + " -d@" + setup_view_info 
+
+        else:
+            print "View Definition Not Found!!"
 
         print "*** Setting up View ***"
         print setup_exec_string

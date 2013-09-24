@@ -1,0 +1,13 @@
+
+{
+
+"views" : 
+    { "promotion_category": 
+        { 
+          "map" : "function(doc, meta) {\n if ( doc.doc_type == \"user_profile\" && doc.profile_details.prefs.promotion_category )\n emit( doc.profile_details.prefs.promotion_category, null );\n}" ,
+          "reduce" : "_count"
+        }
+    }
+
+}
+

@@ -26,15 +26,25 @@ class ViewPythonQueryHelper(QueryHelper):
                                           username=self.couchbase_ini["cb_bucket"], 
                                           password=self.couchbase_ini["cb_bucket_password"]))
 
+        if "view_def" in self.query_conf:         
+            setup_view_info = self.query_conf["view_def"]
+
+        elif "view_def_file" in self.query_conf:
+            setup_view_info =  self.read_json_file("conf/ddocs/" + self.query_conf["view_def_file"])
+
+        else:
+            print "View Definition Not Found!!"
+
+
         print "Creating Design Doc"
-        self.client[0].design_create(self.query_conf["ddoc_name"], 
-                                     self.query_conf["view_def"], 
+        self.clients[0].design_create(self.query_conf["ddoc_name"], 
+                                     setup_view_info, 
                                      use_devmode=False)
         time.sleep(2)
 
         if "create_index" in self.query_conf:
             print "Executing View Query to Build Indexes"
-            query_results = View(self.client[0], 
+            query_results = View(self.clients[0], 
                                  self.query_conf["ddoc_name"], 
                                  self.query_conf["view_name"], 
                                  stale=False, 
@@ -44,6 +54,13 @@ class ViewPythonQueryHelper(QueryHelper):
                 pass
 
     def construct_query(self):
+
+        try:
+            from couchbase.views.params import Query 
+        except ImportError:
+            print "Unable to import Couchbase Python Client. \
+                   Please see http://www.couchbase.com/communities/python/getting-started."
+            sys.exit(0)
 
         q = Query()
 
@@ -60,10 +77,18 @@ class ViewPythonQueryHelper(QueryHelper):
 
     def execute_on_server(self, query_exec_string, worker_id):
 
+        try:
+            from couchbase.views.iterator import View 
+        except ImportError:
+            print "Unable to import Couchbase Python Client. \
+                   Please see http://www.couchbase.com/communities/python/getting-started."
+            sys.exit(0)
+
+
     	print "Executing View Python Query"
 
     	start = time.time()
-    	query_results = View(self.client[worker_id], 
+    	query_results = View(self.clients[worker_id], 
     	                     self.query_conf["ddoc_name"], 
     	                     self.query_conf["view_name"], 
     	                     query = query_exec_string)
@@ -78,5 +103,5 @@ class ViewPythonQueryHelper(QueryHelper):
     def server_cleanup(self):
 
         print "*** Deleting View ***"
-        self.client[0].design_delete(self.query_conf["ddoc_name"], use_devmode=False)
+        self.clients[0].design_delete(self.query_conf["ddoc_name"], use_devmode=False)
 
