@@ -3,7 +3,10 @@
 
 
 '''TODO'''
-##support reading map def from file
+## calculate query throughput
+## use eventlib to get high throughput
+## 
+
 
 import os
 import json

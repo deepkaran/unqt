@@ -1,0 +1,14 @@
+
+
+{
+
+"views" : 
+    { "state": 
+        { 
+          "map" : "function(doc, meta) {\n if ( doc.doc_type == \"user_profile\" && doc.personal_details.state )\n emit( doc.personal_details.state, null );\n}" ,
+          "reduce" : "_count"
+        }
+    }
+
+}
+

@@ -73,6 +73,18 @@ class ViewPythonQueryHelper(QueryHelper):
             q.update(startkey=query_params["startkey"])
         if "endkey" in query_params:
             q.update(endkey=query_params["endkey"])
+        if "mapkey_range" in query_params:
+            q.update(mapkey_range=query_params["mapkey_range"])
+        if "group" in query_params:
+            q.update(group=query_params["group"])
+        if "group_level" in query_params:
+            q.update(group_level=query_params["group_level"])
+        if "reduce" in query_params:
+            q.update(reduce=query_params["reduce"])
+        if "limit" in query_params:
+            q.update(limit=query_params["limit"])
+            
+        q.update(connection_timeout=300000)
 
         return q   
 
