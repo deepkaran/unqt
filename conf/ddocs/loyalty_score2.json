@@ -1,0 +1,13 @@
+
+
+{
+
+"views" : 
+    { "loyalty_score": 
+        { 
+          "map" : "function(doc, meta) {\n if ( doc.doc_type == \"user_profile\" && doc.profile_details.loyalty.loyalty_score )\n emit( doc.profile_details.loyalty.loyalty_score, profile_details.user_id );\n}"
+        }
+    }
+
+}
+
