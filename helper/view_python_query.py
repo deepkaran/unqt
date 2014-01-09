@@ -25,7 +25,8 @@ class ViewPythonQueryHelper(QueryHelper):
                         Couchbase.connect(host=self.couchbase_ini["cb_server"], 
                                           bucket=self.couchbase_ini["cb_bucket"], 
                                           username=self.couchbase_ini["cb_bucket"], 
-                                          password=self.couchbase_ini["cb_bucket_password"]))
+                                          password=self.couchbase_ini["cb_bucket_password"],
+                                          timeout = 2.5))
 
         if "view_def" in self.query_conf:         
             setup_view_info = self.query_conf["view_def"]
@@ -48,8 +49,9 @@ class ViewPythonQueryHelper(QueryHelper):
             query_results = View(self.clients[0], 
                                  self.query_conf["ddoc_name"], 
                                  self.query_conf["view_name"], 
-                                 stale=False, 
+                                 stale="false", 
                                  connection_timeout = 300000)
+            time.sleep(300)
                                  
             for result in query_results:
                 pass
@@ -110,6 +112,10 @@ class ViewPythonQueryHelper(QueryHelper):
             print("Emitted key: {0}, value: {1}".format(result.key, result.value))
 
     	end = time.time()
+
+#        for result in query_results:
+#            print("Emitted key: {0}, value: {1}".format(result.key, result.value))
+
     	query_exec_time = end - start
         return query_results, query_exec_time    	
 

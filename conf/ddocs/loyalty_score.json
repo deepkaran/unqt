@@ -5,8 +5,7 @@
 "views" : 
     { "loyalty_score": 
         { 
-          "map" : "function(doc, meta) {\n if ( doc.doc_type == \"user_profile\" && doc.profile_details.loyalty.loyalty_score )\n emit( doc.profile_details.loyalty.loyalty_score, doc.profile_details.user_id );\n}",
-          "reduce" : "_count"
+          "map" : "function(doc, meta) {\n if ( doc.doc_type == \"user_profile\" && doc.profile_details.loyalty.loyalty_score )\n emit( doc.profile_details.loyalty.loyalty_score, doc.profile_details.user_id );\n}"
         }
     }
 

@@ -46,7 +46,10 @@ class MongoPythonQueryHelper(QueryHelper):
     	    category = "find"
 
     	if category == "find":
-            query_results = self.collections[worker_id].find(query_exec_string)
+    	    if "projection" in self.query_conf:
+                query_results = self.collections[worker_id].find(query_exec_string, self.query_conf["projection"])
+            else:
+                query_results = self.collections[worker_id].find(query_exec_string)
 
         elif category == "count":
             query_results = self.collections[worker_id].find(query_exec_string).count()
@@ -56,9 +59,9 @@ class MongoPythonQueryHelper(QueryHelper):
 
         elif category == "orderby":
             if "limit" in self.query_conf:
-                query_results = self.collections[worker_id].find().sort(self.query_conf["orderby"], 1).limit(self.query_conf["limit"])
+                query_results = self.collections[worker_id].find(self.query_conf["query"], self.query_conf["projection"]).sort(self.query_conf["orderby"], 1).limit(self.query_conf["limit"])
             else:
-                query_results = self.collections[worker_id].find().sort(self.query_conf["orderby"], 1)
+                query_results = self.collections[worker_id].find(self.query_conf["query"], self.query_conf["projection"]).sort(self.query_conf["orderby"], 1)
 
         elif category == "distinct":
             query_results = self.collections[worker_id].distinct(query_exec_string)
